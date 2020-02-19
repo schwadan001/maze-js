@@ -1,12 +1,27 @@
-function getMaze(width, height) {
+/**
+ * Generates a maze using the recursive backtracking algorithm and returns it in a 2D array
+ * http://weblog.jamisbuck.org/2010/12/27/maze-generation-recursive-backtracking
+ * 
+ * @param {Int} width 
+ * @param {Int} height 
+ * @param {Char} start 
+ * @param {Char} end 
+ * @param {Char} empty 
+ * @param {Char} wall 
+ */
+function getMaze(width, height, start, end, empty, wall) {
 
+    /**
+     * The magic that makes recursive backtracking work
+     * @param {Int} cx 
+     * @param {Int} cy 
+     * @param {Array[Array[Int]]} grid 
+     */
     function carve_passages_from(cx, cy, grid) {
-        var directions = shuffle(dirs);
-
-        directions.forEach(function (direction) {
+        shuffle(dirs);
+        dirs.forEach(function (direction) {
             var nx = cx + DX[direction];
             var ny = cy + DY[direction];
-
             if (ny >= 0 && ny <= (grid.length - 1) && nx >= 0
                 && nx <= (grid.length - 1) && sum(grid[ny][nx]) == 0) {
                 grid[cy][cx].push(dirsValue[direction]);
@@ -16,32 +31,54 @@ function getMaze(width, height) {
         })
     }
 
-    function shuffle(o) {
-        for (var j, x, i = o.length; i; j = Math.floor(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
-        return o;
+    /** 
+     * Randomly shuffles an array in-place
+     * @param {Array} arr 
+     */
+    function shuffle(arr) {
+        for (var j, x, i = arr.length; i; j = Math.floor(Math.random() * i), x = arr[--i], arr[i] = arr[j], arr[j] = x);
     };
 
+    /** 
+     * Returns the summation of an array of numbers
+     * @param {Array[Number]} arr 
+     */
     function sum(arr) {
         return arr.reduce((a, b) => a + b, 0);
     }
 
-    function isCorner(maze, w, h) {
+    /** 
+     * Returns whether a space of the maze is considered a corner
+     * A corner is part of the open path, and is surrounded by walls on all sides except one
+     * @param {Array[Array[String]]} maze 
+     * @param {Int} x 
+     * @param {Int} y 
+     */
+    function isCorner(maze, x, y) {
         var wallCount = 0;
-        if (maze[h + 1][w] == 'x') { wallCount++ }
-        if (maze[h - 1][w] == 'x') { wallCount++ }
-        if (maze[h][w + 1] == 'x') { wallCount++ }
-        if (maze[h][w - 1] == 'x') { wallCount++ }
-        return wallCount == 3;
+        if (maze[y + 1][x] == wall) { wallCount++ }
+        if (maze[y - 1][x] == wall) { wallCount++ }
+        if (maze[y][x + 1] == wall) { wallCount++ }
+        if (maze[y][x - 1] == wall) { wallCount++ }
+        return maze[y][x] == empty && wallCount == 3;
     }
+
+    /**
+     * Initialize grid for recursive backtracking algorithm
+     */
 
     var grid = [];
 
-    for (var h = 0; h < height; h++) {
+    for (var y = 0; y < height; y++) {
         grid.push([]);
-        for (var w = 0; w < width; w++) {
-            grid[h].push([]);
+        for (var x = 0; x < width; x++) {
+            grid[y].push([]);
         }
     }
+
+    /**
+     * Do recursive backtracking to generate maze definition
+     */
 
     var [N, S, E, W] = [1, 2, 4, 8];
     var dirs = ['N', 'E', 'S', 'W'];
@@ -54,50 +91,57 @@ function getMaze(width, height) {
 
     var maze = [];
     var [mazeHeight, mazeWidth] = [height * 2 + 1, width * 2 + 1];
-    for (var h = 0; h < mazeHeight; h++) {
+    for (var y = 0; y < mazeHeight; y++) {
         maze.push([]);
-        for (var w = 0; w < mazeWidth; w++) {
-            maze[h].push('x');
+        for (var x = 0; x < mazeWidth; x++) {
+            maze[y].push(wall);
         }
     }
 
-    for (var h = 0; h < height; h++) {
-        for (var w = 0; w < width; w++) {
-            [mazeH, mazeW] = [h * 2 + 1, w * 2 + 1];
-            if (grid[h][w].includes(N) || grid[h][w].includes(S) || grid[h][w].includes(E) || grid[h][w].includes(W)) {
-                maze[mazeH][mazeW] = ' ';
+    /**
+     * Convert maze definition into a nested array that's easy to use
+     */
+
+    for (var y = 0; y < height; y++) {
+        for (var x = 0; x < width; x++) {
+            [mazeH, mazeW] = [y * 2 + 1, x * 2 + 1];
+            if (grid[y][x].includes(N) || grid[y][x].includes(S) || grid[y][x].includes(E) || grid[y][x].includes(W)) {
+                maze[mazeH][mazeW] = empty;
             }
-            if (grid[h][w].includes(N) && h > 1) {
-                maze[mazeH - 1][mazeW] = ' ';
+            if (grid[y][x].includes(N) && y > 1) {
+                maze[mazeH - 1][mazeW] = empty;
             }
-            if (grid[h][w].includes(S) && h < mazeHeight - 1) {
-                maze[mazeH + 1][mazeW] = ' ';
+            if (grid[y][x].includes(S) && y < mazeHeight - 1) {
+                maze[mazeH + 1][mazeW] = empty;
             }
-            if (grid[h][w].includes(E) && w < mazeWidth - 1) {
-                maze[mazeH][mazeW + 1] = ' ';
+            if (grid[y][x].includes(E) && x < mazeWidth - 1) {
+                maze[mazeH][mazeW + 1] = empty;
             }
-            if (grid[h][w].includes(W) && w > 1) {
-                maze[mazeH][mazeW - 1] = ' ';
+            if (grid[y][x].includes(W) && x > 1) {
+                maze[mazeH][mazeW - 1] = empty;
             }
         }
     }
 
+    // place the start location in a random open corner
     var [placedStart, placedEnd] = [false, false];
     while (!placedStart) {
-        var h = parseInt(Math.random() * mazeHeight - 2, 10) + 1;
-        var w = parseInt(Math.random() * mazeWidth - 2, 10) + 1;
-        if (maze[h][w] == ' ' && isCorner(maze, w, h)) {
-            maze[h][w] = 's';
+        var y = parseInt(Math.random() * (mazeHeight - 2)) + 1;
+        var x = parseInt(Math.random() * (mazeWidth - 2)) + 1;
+        if (isCorner(maze, x, y)) {
+            maze[y][x] = start;
             placedStart = true;
         }
     }
+    // place the end location in a random open corner
     while (!placedEnd) {
-        var h = parseInt(Math.random() * mazeHeight - 2, 10) + 1;
-        var w = parseInt(Math.random() * mazeWidth - 2, 10) + 1;
-        if (maze[h][w] == ' ' && isCorner(maze, w, h)) {
-            maze[h][w] = 'e';
+        var y = parseInt(Math.random() * (mazeHeight - 2)) + 1;
+        var x = parseInt(Math.random() * (mazeHeight - 2)) + 1;
+        if (isCorner(maze, x, y)) {
+            maze[y][x] = end;
             placedEnd = true;
         }
     }
+
     return maze;
 }

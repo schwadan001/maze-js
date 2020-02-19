@@ -1,36 +1,39 @@
-var dim = 30;
-var maze = getMaze(dim, dim);
+var mazeDim = 30;
+var maze, queue, bestPaths, bestPathIdx, searchCount, lastTime, mazeW, mazeH, sqDim;
 
-var [START, END, EMPTY, TRAVERSED, WALL] = ['s', 'e', ' ', 't', 'x'];
+var [START, END, EMPTY, TRAVERSED, WALL, BESTPATH] = ['s', 'e', ' ', 't', 'x', 'b'];
 
 var colors = {
     's': 'red',
     'e': 'blue',
     ' ': 'white',
     't': 'lightgreen',
-    'x': 'grey'
+    'x': 'grey',
+    'b': '#bea5df'
 }
-
-var queue = [];
-var bestPaths = {};
-var searchCount = 0;
-var times = { 'p': 0, 'd': 0, 'w': 0 };
-var lastTime = (new Date).getTime();
-
-var mazeW = maze[0].length;
-var mazeH = maze.length;
 
 var mazeId = 'maze';
 
-var dim = 7;
-
-function setDimension() {
-    let winW = $(window).width() - 20;
-    let winH = $(window).height() * 0.75;
-    dim = Math.max(Math.min(winW / mazeW, winH / mazeH), 1);
+function setMaze() {
+    maze = getMaze(mazeDim, mazeDim, START, END, EMPTY, WALL);
+    mazeW = maze[0].length;
+    mazeH = maze.length;
+    queue = [];
+    bestPaths = {};
+    bestPathIdx = 1;
+    searchCount = 0;
+    lastTime = (new Date).getTime();
+    updateDimensions();
+    setMazeDisplay();
 }
 
-function setDisplay() {
+function updateDimensions() {
+    let winW = $(window).width() - 20;
+    let winH = $(window).height() * 0.75;
+    sqDim = Math.max(Math.min(winW / mazeW, winH / mazeH), 1);
+}
+
+function setMazeDisplay() {
     var tableStr = '';
     for (var row = 0; row < maze.length; row++) {
         tableStr += '<tr>';
@@ -38,7 +41,7 @@ function setDisplay() {
             let square = maze[row][col];
             let bg = (colors[square] != undefined) ? colors[square] : 'grey';
             tableStr += '<td id="' + getSqId({ 'x': col, 'y': row }) +
-                '" style="background-color:' + bg + ';width:' + dim + 'px;height:' + dim + 'px;"></td>';
+                '" style="background-color:' + bg + ';width:' + sqDim + 'px;height:' + sqDim + 'px;"></td>';
         }
         tableStr += '</tr>';
     }
@@ -89,8 +92,7 @@ function getSqId(sq) {
     return String(sq.x) + ',' + String(sq.y);
 }
 
-function traverse() {
-    times['w'] += (new Date).getTime() - lastTime;
+function traverseBFS() {
     lastTime = (new Date).getTime();
     let endSqStr = getSqId(findSquare(END));
     if (queue.length > 0 && bestPaths[endSqStr] == undefined) {
@@ -107,32 +109,57 @@ function traverse() {
             });
             options.forEach(o => queue.push(o));
             sortQueue();
-            times['p'] += (new Date).getTime() - lastTime;
             lastTime = (new Date).getTime();
             if (maze[y][x] != START) {
                 maze[y][x] = TRAVERSED;
-                this.updateDisplay(sq);
+                updateDisplay(sq);
             }
-            times['d'] += (new Date).getTime() - lastTime;
             lastTime = (new Date).getTime();
-            window.postMessage('iterate', '*');
+            window.postMessage('traverseBFS', '*');
+        } else {
+            setTimeout(traverseBestPath, 1000);
         }
+    } else if (queue.length == 0 && bestPaths[endSqStr] == undefined) {
+        queue.push({ 'sq': findSquare(START), 'path': [] });
+        window.postMessage('traverseBFS', '*');
+    }
+}
+
+function traverseBestPath() {
+    lastTime = (new Date).getTime();
+    let endSqStr = getSqId(findSquare(END));
+    let path = bestPaths[endSqStr];
+    if (path != undefined && bestPathIdx < path.length) {
+        let sq = path[bestPathIdx++];
+        maze[sq.y][sq.x] = BESTPATH;
+        updateDisplay(sq);
+        window.postMessage('traverseBestPath', '*');
     }
 }
 
 async function handleMessage(event) {
-    if ((new Date).getTime() - lastTime >= Math.max(15000/(mazeW * mazeH), 1)) {
-        traverse();
-    } else {
-        window.postMessage('iterate', '*');
+    let messageMap = {
+        'traverseBFS': traverseBFS,
+        'traverseBestPath': traverseBestPath
     }
+    let interval = {
+        'traverseBFS': Math.max(15000 / (mazeW * mazeH), 1),
+        'traverseBestPath': Math.max(50000 / (mazeW * mazeH), 1)
+    }
+    Object.keys(messageMap).forEach(key => {
+        if (key == event.data) {
+            if ((new Date).getTime() - lastTime >= interval[key]) {
+                messageMap[key]();
+            } else {
+                window.postMessage(event.data, '*');
+            }
+        }
+    })
 }
 
 window.addEventListener('message', handleMessage, false);
 
 window.onload = function () {
-    this.setDimension();
-    this.setDisplay();
-    this.queue.push({ 'sq': this.findSquare(this.START), 'path': [] });
-    this.traverse();
+    this.setMaze();
+    this.traverseBFS();
 }
